@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ember Valley Air Mail</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #1a2230;
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  #app, #app canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+  .hidden { display: none !important; }
+  #hud { position: fixed; inset: 0; pointer-events: none; color: #e8f0f8;
+    text-shadow: 0 1px 3px rgba(0,0,0,.7); }
+  .panel { position: absolute; background: rgba(10,16,26,.62); border: 1px solid rgba(255,255,255,.16);
+    border-radius: 10px; padding: 8px 12px; backdrop-filter: blur(2px); }
+  #mission-panel { top: 14px; left: 14px; min-width: 250px; }
+  #mission-panel .name { font-weight: 800; letter-spacing: .08em; font-size: 14px; color: #ffd23a; }
+  #mission-panel .dest { font-size: 15px; font-weight: 700; margin-top: 2px; }
+  #mission-panel .row { display: flex; gap: 16px; font-size: 13px; margin-top: 4px; color: #cfe0ee; }
+  #mission-panel .row b { color: #fff; }
+  #compass-wrap { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); }
+  #compass { display: block; border-radius: 6px; }
+  #wind { position: absolute; top: 56px; left: 50%; transform: translateX(-50%);
+    font-size: 12px; letter-spacing: .06em; color: #cfe0ee; }
+  #instruments { position: absolute; left: 14px; bottom: 14px; display: flex; gap: 10px; align-items: flex-end; }
+  #horizon { border-radius: 50%; border: 2px solid rgba(255,255,255,.35); background: #22303f; }
+  .gauge { text-align: center; min-width: 86px; }
+  .gauge .value { font-size: 34px; font-weight: 800; line-height: 1; color: #fff; }
+  .gauge .label { font-size: 11px; letter-spacing: .12em; color: #cfe0ee; margin-top: 3px; }
+  #bars { position: absolute; right: 14px; bottom: 14px; width: 210px; }
+  .bar-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; font-size: 12px; }
+  .bar-row .tag { width: 74px; letter-spacing: .08em; color: #cfe0ee; }
+  .bar { flex: 1; height: 12px; background: rgba(255,255,255,.18); border-radius: 6px; overflow: hidden; }
+  .bar > div { height: 100%; border-radius: 6px; }
+  #throttle-fill { background: #ffd23a; width: 0%; }
+  #fuel-fill { background: #7ac74f; width: 100%; }
+  .bar-row .pct { width: 38px; text-align: right; font-weight: 700; }
+  #g-box { position: absolute; right: 14px; top: 14px; text-align: right; }
+  #g-box .value { font-size: 26px; font-weight: 800; }
+  #g-box .label { font-size: 11px; letter-spacing: .12em; color: #cfe0ee; }
+  #warns { position: absolute; left: 50%; bottom: 120px; transform: translateX(-50%);
+    text-align: center; font-weight: 800; letter-spacing: .1em; }
+  #stall-warn { color: #ff6a4a; font-size: 20px; visibility: hidden; }
+  #fuel-warn { color: #ffb13a; font-size: 16px; visibility: hidden; margin-top: 4px; }
+  #toasts { position: absolute; left: 50%; top: 110px; transform: translateX(-50%);
+    display: flex; flex-direction: column; gap: 6px; align-items: center; }
+  .toast { background: rgba(10,16,26,.78); border: 1px solid rgba(255,210,58,.5); color: #ffe9a8;
+    padding: 7px 16px; border-radius: 20px; font-size: 14px; font-weight: 700; letter-spacing: .04em;
+    white-space: nowrap; }
+  #centre-msg { position: absolute; left: 50%; top: 38%; transform: translateX(-50%);
+    font-size: 44px; font-weight: 900; letter-spacing: .1em; color: #fff; opacity: 0;
+    transition: opacity .4s; text-shadow: 0 2px 12px rgba(0,0,0,.8); }
+  #hud-buttons { position: absolute; right: 14px; top: 86px; display: flex; flex-direction: column; gap: 8px; }
+  .hbtn { pointer-events: auto; background: rgba(10,16,26,.62); color: #e8f0f8;
+    border: 1px solid rgba(255,255,255,.25); border-radius: 8px; padding: 7px 12px;
+    font-size: 12px; font-weight: 700; letter-spacing: .06em; cursor: pointer; }
+  .hbtn:hover { background: rgba(40,60,86,.8); }
+  .screen { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(8,12,20,.45); z-index: 5; }
+  .card { background: rgba(12,18,30,.92); border: 1px solid rgba(255,210,58,.35); border-radius: 16px;
+    padding: 30px 36px; max-width: 560px; text-align: center; color: #e8f0f8;
+    box-shadow: 0 12px 48px rgba(0,0,0,.5); }
+  .card h1 { margin: 0 0 4px; font-size: 40px; letter-spacing: .04em; color: #ffd23a; }
+  .card h2 { margin: 0 0 10px; font-size: 26px; color: #ffd23a; }
+  .card .sub { color: #cfe0ee; font-size: 15px; line-height: 1.5; }
+  .card .controls { text-align: left; font-size: 13.5px; line-height: 1.9; color: #dbe8f2;
+    margin: 16px auto 4px; display: inline-block; }
+  .card .controls b { color: #ffd23a; }
+  .big-btn { pointer-events: auto; margin-top: 18px; background: #ffd23a; color: #1a2230; border: none;
+    border-radius: 10px; padding: 13px 34px; font-size: 17px; font-weight: 800; letter-spacing: .05em;
+    cursor: pointer; }
+  .big-btn:hover { background: #ffe08a; }
+  #best-score { margin-top: 12px; font-size: 13px; letter-spacing: .1em; color: #9fb4c8; }
+  .day-row { display: flex; justify-content: space-between; gap: 40px; font-size: 15px;
+    padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,.1); }
+  #day-total { font-size: 26px; font-weight: 800; color: #ffd23a; margin-top: 12px; }
+  #status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+</style>
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.min.js" } }
+</script>
+</head>
+<body>
+<div id="app"></div>
+
+<div id="hud" class="hidden">
+  <div id="mission-panel" class="panel">
+    <div class="name" id="mission-name">1/3 · MORNING POST</div>
+    <div class="dest" id="mission-dest">RING 1/5</div>
+    <div class="row"><span>DIST <b id="mission-dist">– KM</b></span><span>TIME <b id="mission-time">4:20</b></span></div>
+  </div>
+  <div id="compass-wrap"><canvas id="compass" width="300" height="34"></canvas></div>
+  <div id="wind">WIND 000° 0KT</div>
+  <div id="instruments">
+    <canvas id="horizon" width="150" height="150"></canvas>
+    <div class="gauge"><div class="value" id="airspeed">0</div><div class="label">AIRSPEED KT</div></div>
+    <div class="gauge"><div class="value" id="altitude">0</div><div class="label">ALT AGL FT</div></div>
+    <div class="gauge"><div class="value" id="vspeed">+0</div><div class="label">V/S FPM</div></div>
+  </div>
+  <div id="bars">
+    <div class="bar-row"><span class="tag">THROTTLE</span><div class="bar"><div id="throttle-fill"></div></div><span class="pct" id="throttle-pct">0%</span></div>
+    <div class="bar-row"><span class="tag">FUEL</span><div class="bar"><div id="fuel-fill"></div></div><span class="pct" id="fuel-pct">100%</span></div>
+  </div>
+  <div id="g-box" class="panel"><div class="value"><span id="g-meter">1.0</span> G</div><div class="label">LOAD FACTOR</div></div>
+  <div id="warns"><div id="stall-warn">⚠ STALL — NOSE DOWN, ADD POWER</div><div id="fuel-warn">⚠ LOW FUEL — NEAREST STRIP</div></div>
+  <div id="toasts"></div>
+  <div id="centre-msg"></div>
+  <div id="hud-buttons">
+    <button class="hbtn" id="camera-btn">CAM: CHASE</button>
+    <button class="hbtn" id="mute-btn">SOUND: ON</button>
+  </div>
+</div>
+
+<div id="screen-title" class="screen">
+  <div class="card">
+    <h1>EMBER VALLEY<br>AIR MAIL</h1>
+    <p class="sub">Fly the morning mail through a mountain valley. Three legs, three villages,
+      one little red-and-cream plane — and a river that forgives nothing.</p>
+    <div class="controls">
+      <b>W / S</b> throttle &nbsp;·&nbsp; <b>↑ / ↓</b> pitch &nbsp;·&nbsp; <b>← / →</b> or <b>A / D</b> bank &amp; turn<br>
+      <b>Q / E</b> rudder &nbsp;·&nbsp; <b>F</b> flaps &nbsp;·&nbsp; <b>B</b> brakes &nbsp;·&nbsp; <b>C</b> camera<br>
+      <b>P</b> pause &nbsp;·&nbsp; <b>R</b> restart &nbsp;·&nbsp; <b>M</b> mute &nbsp;·&nbsp; drag mouse to look
+    </div>
+    <br><button class="big-btn" id="start-btn">START THE MAIL DAY</button>
+    <div id="best-score"></div>
+  </div>
+</div>
+
+<div id="screen-brief" class="screen hidden">
+  <div class="card">
+    <h2 id="brief-title">LEG 1 — MORNING POST</h2>
+    <p class="sub" id="brief-text"></p>
+    <br><button class="big-btn" id="fly-btn">FLY THIS LEG</button>
+  </div>
+</div>
+
+<div id="screen-pause" class="screen hidden">
+  <div class="card">
+    <h2>PAUSED</h2>
+    <p class="sub">The valley waits. The mail does not fly itself — well, not today.</p>
+    <br><button class="big-btn" id="resume-btn">RESUME</button>
+    <button class="big-btn" id="restart-btn" style="background:#e8e0cc">RESTART DAY</button>
+  </div>
+</div>
+
+<div id="screen-crash" class="screen hidden">
+  <div class="card">
+    <h2>DOWN IN THE VALLEY</h2>
+    <p class="sub" id="crash-reason"></p>
+    <br><button class="big-btn" id="crash-restart-btn">FLY THE LEG AGAIN</button>
+  </div>
+</div>
+
+<div id="screen-day" class="screen hidden">
+  <div class="card">
+    <h2>MAIL DAY COMPLETE</h2>
+    <div id="day-rows"></div>
+    <div id="day-total"></div>
+    <p class="sub">Every village has its letters. The kettle is on at Ember Field.</p>
+    <br><button class="big-btn" id="day-restart-btn">FLY ANOTHER DAY</button>
+  </div>
+</div>
+
+<p id="status" role="status" aria-live="polite"></p>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
